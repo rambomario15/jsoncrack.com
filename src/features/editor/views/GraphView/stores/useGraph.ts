@@ -43,6 +43,7 @@ interface GraphActions {
   centerView: () => void;
   clearGraph: () => void;
   setZoomFactor: (zoomFactor: number) => void;
+  updateNodeValues: (nodeId: string, updates: { index: number; value: any }[]) => void;
 }
 
 const useGraph = create<Graph & GraphActions>((set, get) => ({
@@ -101,6 +102,41 @@ const useGraph = create<Graph & GraphActions>((set, get) => ({
   },
   toggleFullscreen: fullscreen => set({ fullscreen }),
   setViewPort: viewPort => set({ viewPort }),
+  updateNodeValues: (nodeId: string, updates: { index: number; value: any }[]) => {
+    try {
+      const useJsonStore = require("../../../../../store/useJson").default;
+      const currentJson = useJsonStore.getState().json;
+      const parsed = JSON.parse(currentJson);
+      const nodes = get().nodes || [];
+      const nodeToUpdate = nodes.find(n => n.id === nodeId);
+      
+      if (!nodeToUpdate || !nodeToUpdate.path) {
+        console.error("Node not found or path is undefined");
+        return;
+      }
+
+      // Navigate to target using JSONPath
+      let target: any = parsed;
+      for (const seg of nodeToUpdate.path) {
+        target = target[seg as any];
+      }
+
+      // Apply each update
+      updates.forEach(u => {
+        const row = nodeToUpdate.text[u.index];
+        if (!row || !row.key) return;
+        target[row.key] = u.value;
+      });
+
+      // Update JSON and force re-parse in graph
+      const updatedJson = JSON.stringify(parsed, null, 2);
+      useJsonStore.getState().setJson(updatedJson);
+      
+      console.log("Updated JSON:", updatedJson); // debug
+    } catch (error) {
+      console.error("Failed to update node values:", error);
+    }
+  },
 }));
 
 export default useGraph;
